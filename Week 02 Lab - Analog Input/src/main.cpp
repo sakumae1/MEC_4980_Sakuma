@@ -1,7 +1,16 @@
 #include <Arduino.h>
+#include <string.h>
+#include <Ticker.h>
 
 // put function declarations here:
 int myFunction(int, int);
+volatile String printSentence = "";
+long prevSampleTime = 0;
+long timeBetweenSamplesMs = 100;
+
+void myFunction();
+
+Ticker newTimerFn(myFunction, timeBetweenSamplesMs, 0, MILLIS);
 
 void setup() {
   Serial.begin(9600);
@@ -13,27 +22,27 @@ void setup() {
   pinMode(1, INPUT_PULLDOWN);
   pinMode(2, INPUT_PULLDOWN);
   
+  newTimerFn.start();
 }
 
-long prevSampleTime = 0;
-long timeBetweenSamplesMs = 100;
+
 void loop() {
   long currentTime = millis();
-  if (millis() > prevSampleTime + timeBetweenSamplesMs) {    
-    // put your main code here, to run repeatedly:
-    Serial.print("D0, D1, D2, A0: ");
-    Serial.print(digitalRead(0));
-    Serial.print(digitalRead(1));
-    Serial.print(digitalRead(2));
-    Serial.print("    ");
-    Serial.println(analogRead(A0));
+  newTimerFn.update();
+  if (strcmp(printSentence, "")) {
+    Serial.println(printSentence);
+    printSentence = " ";
+  }
 
-        // delayMicroseconds(100); // delay so that we can sample data and/or execute some task
-        // NOTE: Serial.print an delayMicroseconds prevent everything else from happening when they are executed
+  if (currentTime > prevSampleTime + timeBetweenSamplesMs) {   
+   
+    Serial.println(printSentence);
     prevSampleTime = currentTime; }
 }
 
 // put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+void myFunction() {
+  printSentence =  "D0, D1, D2, A0: ";
+  printSentence += (String(digitalRead(0)) + ", " + String(digitalRead(1)) + ", " + String(digitalRead(2)));
+  printSentence += " , " + String(analogRead(A0));
 }
