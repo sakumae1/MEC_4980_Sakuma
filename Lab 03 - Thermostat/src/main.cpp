@@ -15,10 +15,15 @@
   BSD license, all text above must be included in any redistribution
  ***************************************************************************/
 
-#include <Wire.h> // most popular I2C library
-#include <SPI.h> // alternative to I2C
+#include <Wire.h> 
+#include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
+#include <Adafruit_ST7789.h>
+Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+GFXcanvas16 canvas(240, 135);
+long startTime = 0;
+
 
 #define BME_SCK 13
 #define BME_MISO 12
@@ -42,11 +47,13 @@ enum menuState {
 
 enum tempState {
   C,
-  F
+  F,
+  tcount
 };
 
 hvacState opMode = Heating;
 menuState menuMode = TemperatureMenu;
+tempState tempMode = C; 
 float targetTemp = 24.0; // floating point (target) temperature
 volatile long prevChangeTime = 0;
 volatile long prevChangeTimeTwo = 0;
@@ -75,8 +82,24 @@ Adafruit_BME680 bme(&Wire); // I2C
 //Adafruit_BME680 bme(BME_CS); // hardware SPI
 //Adafruit_BME680 bme(BME_CS, BME_MOSI, BME_MISO,  BME_SCK);
 
+float getCurrentTemp() {
+  if (tempMode == tempState::C) {
+    return bme.temperature;
+  }
+  if (tempMode == tempState::F) {
+    return bme.temperature * 9. / 5. + 32.;
+  }
+  return -1100.;
+}
+
 void setup() {
-  Serial.begin(9600);
+  display.init(135, 240);
+  display.setRotation(3);
+  canvas.setTextColor(ST77XX_GREEN);
+  pinMode(TFT_BACKLITE, OUTPUT);
+  digitalWrite(TFT_BACKLITE, 1);
+      startTime = millis();
+      Serial.begin(9600);
   while (!Serial);
   Serial.println(F("BME680 test"));
 
@@ -105,21 +128,36 @@ void loop() {
     return;
   }
 
+  // canvas.fillScreen(ST77XX_ORANGE);
+  // canvas.setCursor(0,20);
+  // canvas.print("Setup took  ");
+  // canvas.print(startTime);
+  // canvas.print(" milliseconds");
+  // long currentTime = getTime();
+  // canvas.print(currentTime);
+  // display.drawRGBBitmap(0,0, canvas.getBuffer(), 240, 135);
+  // delay(50);
 
-  float currentTemp = bme.temperature;
-  Serial.print("Temperature = ");
-  Serial.print(currentTemp);
-  Serial.print(" *C");
-  Serial.print(" with target ");
-  Serial.print(targetTemp);
-  Serial.print(" operating in mode ");
-  Serial.print((int)opMode);
-  Serial.print(" in menu ");
-  Serial.println(menuMode);
+  float currentTemp = getCurrentTemp();
+  canvas.fillScreen(ST77XX_ORANGE);
+  canvas.setCursor(0,20);
+  canvas.print("Temperature = ");
+  canvas.print(currentTemp);
+  canvas.print(" *C");
+  canvas.print(" with target ");
+  canvas.print(targetTemp);
+  canvas.print(" *C");
+  canvas.print(" operating in mode ");
+  canvas.print((int)opMode);
+  canvas.print(" in menu ");
+  canvas.println(menuMode);
+  // delay(50);
 
 if (menuButtonFlag) {
   menuButtonFlag = false;
   menuMode = (menuState)(((int)menuMode + 1) % (int)menuState::mCount);
+  Serial.print("!!!!!!Moving to menu: ");
+  Serial.println(menuMode);
 }
 
   if (changeButtonFlag) {
@@ -133,7 +171,7 @@ if (menuButtonFlag) {
       opMode = (hvacState)(((int)opMode + 1) % (int)hvacState::hCount);
     }
     if (menuMode == UnitMenu) {
-
+      // change from F to C or C to F
     }
     changeButtonFlag = false;
     
@@ -141,12 +179,14 @@ if (menuButtonFlag) {
 
 if (opMode == Heating) {
   if (currentTemp < targetTemp) {
-    Serial.println("Heater is on now!");
+    canvas.println("Heater is on now!");
   }
 } else if (opMode == Cooling)
   if (currentTemp > targetTemp) {
-    Serial.println("AC is on now!");
+    canvas.println("AC is on now!");
   }
+
+
 
 /*
   Serial.print("Pressure = ");
@@ -157,7 +197,11 @@ if (opMode == Heating) {
   Serial.print(bme.humidity);
   Serial.println(" %");
 */
-
-  Serial.println();
+  // Serial.println();
+  display.drawRGBBitmap(0,0, canvas.getBuffer(), 240, 135);
   delay(100);
+}
+
+long getTime() {
+  return (millis() - startTime);
 }
