@@ -128,16 +128,7 @@ void loop() {
     return;
   }
 
-  // canvas.fillScreen(ST77XX_ORANGE);
-  // canvas.setCursor(0,20);
-  // canvas.print("Setup took  ");
-  // canvas.print(startTime);
-  // canvas.print(" milliseconds");
-  // long currentTime = getTime();
-  // canvas.print(currentTime);
-  // display.drawRGBBitmap(0,0, canvas.getBuffer(), 240, 135);
-  // delay(50);
-
+  // breat into seperate "if statements" to have different menus
   float currentTemp = getCurrentTemp();
   canvas.fillScreen(ST77XX_ORANGE);
   canvas.setCursor(0,20);
