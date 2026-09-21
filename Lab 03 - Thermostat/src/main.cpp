@@ -39,10 +39,11 @@ enum hvacState {
 };
 
 enum menuState {
-  TemperatureMenu, // 0
-  OperationMenu, // 1
-  UnitMenu, // 2
-  mCount // 3
+  MainMenu, // 0
+  TemperatureMenu, // 1
+  OperationMenu, // 2
+  UnitMenu, // 3
+  mCount // 4
 };
 
 enum tempState {
@@ -52,9 +53,10 @@ enum tempState {
 };
 
 hvacState opMode = Heating;
-menuState menuMode = TemperatureMenu;
+menuState menuMode = MainMenu;
 tempState tempMode = C; 
 float targetTemp = 24.0; // floating point (target) temperature
+float targetDisplayTemp;
 volatile long prevChangeTime = 0;
 volatile long prevChangeTimeTwo = 0;
 long debounceTime = 50;
@@ -130,19 +132,114 @@ void loop() {
 
   // breat into seperate "if statements" to have different menus
   float currentTemp = getCurrentTemp();
+
+  if (tempMode == tempState::C) {
+    targetDisplayTemp = targetTemp;
+  } else {
+    targetDisplayTemp = targetTemp * 9. /5. + 32.; // converting target temp based on mode
+  }
+
   canvas.fillScreen(ST77XX_ORANGE);
   canvas.setCursor(0,20);
-  canvas.print("Temperature = ");
-  canvas.print(currentTemp);
-  canvas.print(" *C");
-  canvas.print(" with target ");
-  canvas.print(targetTemp);
-  canvas.print(" *C");
-  canvas.print(" operating in mode ");
-  canvas.print((int)opMode);
-  canvas.print(" in menu ");
-  canvas.println(menuMode);
-  // delay(50);
+
+  // Menu Commands
+  if (menuMode == MainMenu) {
+    canvas.println("Main Menu");
+    canvas.print("Temperature = ");
+    canvas.print(currentTemp);
+
+    if (tempMode == tempState::C) {
+      canvas.print(" *C");
+    } else {
+      canvas.print(" *F");
+    }
+    
+    canvas.println(" with Target ");
+    // canvas.print(targetTemp);
+    canvas.print(targetDisplayTemp);
+
+    if (tempMode == tempState::C) {
+      canvas.println(" *C");
+    } else {
+      canvas.println(" *F");
+    }
+
+    canvas.print("Operating in Mode: ");
+
+    if (opMode == Heating) {
+      canvas.print("Heating");
+    } else if (opMode == Cooling) {
+      canvas.print("Cooling");
+    }
+
+    // if (opMode == Heating) {
+      // if (bme.temperature < targetTemp) {
+      // canvas.println("Heater is on now!");
+      // }
+    // } else if (opMode == Cooling) {
+    // if (bme.temperature > targetTemp) {
+      // canvas.println("AC is on now!");
+    // }
+
+  // Menu 1  
+  } else if (menuMode == TemperatureMenu) {
+    canvas.println("Menu 1");
+    canvas.print("Temperature = ");
+    canvas.print(currentTemp);
+    if (tempMode == tempState::C) {
+      canvas.print(" *C");
+    } else {
+      canvas.print(" *F");
+    }
+    
+    canvas.println(" with Target ");
+    // canvas.print(targetTemp);
+    canvas.print(targetDisplayTemp);
+
+    if (tempMode == tempState::C) {
+      canvas.println(" *C");
+    } else {
+      canvas.println(" *F");
+    }
+
+    canvas.print("Operating in Mode: ");
+
+    if (opMode == Heating) {
+      canvas.print("Heating");
+    } else if (opMode == Cooling) {
+      canvas.print("Cooling");
+    }
+  // Menu 2
+  } else if (menuMode == OperationMenu) {
+      canvas.println("Menu 2");
+      canvas.print("Operation Mode = ");
+      if (opMode == Heating) {
+        canvas.print("Heating");
+      } else if (opMode == Cooling) {
+        canvas.print("Cooling");
+    }
+  // Menu 3
+  } else if (menuMode == UnitMenu) {
+      canvas.println("Menu 3");
+      canvas.print("Temperature Unit Is ");
+      if (tempMode == tempState::C) {
+        canvas.println("Celsius");
+      } else {
+        canvas.println("Fahrenheit");
+      }
+  }
+
+
+  // canvas.print(" in menu ");
+  // if (menuMode == MainMenu) {
+    // canvas.println("1");
+  // } else if(menuMode == TemperatureMenu) {
+    // canvas.println("2");
+  // } else if (menuMode == OperationMenu) {
+    // canvas.println("3");
+  // } else if (menuMode == UnitMenu) {
+    // canvas.println("4");
+  // }
 
 if (menuButtonFlag) {
   menuButtonFlag = false;
@@ -163,18 +260,10 @@ if (menuButtonFlag) {
     }
     if (menuMode == UnitMenu) {
       // change from F to C or C to F
+      tempMode = (tempState)(((int)tempMode + 1) % (int)tempState::tcount);
     }
     changeButtonFlag = false;
     
-  }
-
-if (opMode == Heating) {
-  if (currentTemp < targetTemp) {
-    canvas.println("Heater is on now!");
-  }
-} else if (opMode == Cooling)
-  if (currentTemp > targetTemp) {
-    canvas.println("AC is on now!");
   }
 
 
