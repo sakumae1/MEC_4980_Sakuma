@@ -55,8 +55,8 @@ enum tempState {
 hvacState opMode = Heating;
 menuState menuMode = MainMenu;
 tempState tempMode = C; 
-float targetTemp = 24.0; // floating point (target) temperature
-float targetDisplayTemp;
+float targetTemp = 24.0; // floating point (target) temperature in Celsius
+float targetDisplayTemp; // floating point (target) temperature in user selected unit (C or F)
 volatile long prevChangeTime = 0;
 volatile long prevChangeTimeTwo = 0;
 long debounceTime = 50;
@@ -130,7 +130,6 @@ void loop() {
     return;
   }
 
-  // breat into seperate "if statements" to have different menus
   float currentTemp = getCurrentTemp();
 
   if (tempMode == tempState::C) {
