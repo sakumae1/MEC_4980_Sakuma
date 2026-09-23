@@ -5,6 +5,7 @@
   // Third Screen: Adjust Stride Length
   // Fourth Screen: Raw Accleration Values (ax, ay, az)
 
+
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
@@ -37,6 +38,10 @@ float distance = 0.0;
 float accelX = 0.0;
 float accelY = 0.0;
 float accelZ = 0.0;
+float linearAccelMagnitude = 0.0;
+sh2_SensorValue_t sensorValue;
+bool stepDetect = false;
+unsigned long lastStepTime = 0;
 
 // Buttons
 # define Button_D0 0
@@ -45,18 +50,21 @@ float accelZ = 0.0;
 
 // Setup
 void setup() {
-  Serial.begin();
+  Serial.begin(9600);
 
   // Display
   display.init(135, 240);
   display.setRotation(3);
   canvas.setTextColor(ST77XX_GREEN);
-  digitalWrite(TFT_BACKLITE, HIGH);
+  pinMode(TFT_BACKLITE, OUTPUT);
+  digitalWrite(TFT_BACKLITE, 1);
+  digitalWrite(TFT_I2C_POWER, HIGH);
+  delay(10);
 
   // Buttons
-  pinMode(Button_D0, INPUT);
-  pinMode(Button_D1, INPUT);
-  pinMode(Button_D2, INPUT);
+  pinMode(Button_D0, INPUT_PULLUP);
+  pinMode(Button_D1, INPUT_PULLDOWN);
+  pinMode(Button_D2, INPUT_PULLDOWN);
 
   // Initialize Accelerometer
   if (!accelerometer.begin_I2C()) {
@@ -64,21 +72,145 @@ void setup() {
     while(1);
   }
   Serial.println("BNO085 found!");
+
+  accelerometer.enableReport(SH2_ACCELEROMETER, 20000);
+  accelerometer.enableReport(SH2_LINEAR_ACCELERATION, 20000);
+  accelerometer.enableReport(SH2_RAW_ACCELEROMETER, 20000);
 }
 
 // loop
 void loop () {
   // Read accelerometer
+  if (accelerometer.wasReset()) {
+    accelerometer.enableReport(SH2_ACCELEROMETER, 20000);
+    accelerometer.enableReport(SH2_LINEAR_ACCELERATION, 20000);
+    accelerometer.enableReport(SH2_RAW_ACCELEROMETER, 20000);
+  }
 
+  if (accelerometer.getSensorEvent(&sensorValue)) {
+    if (sensorValue.sensorId == SH2_RAW_ACCELEROMETER) {
+
+      accelX = sensorValue.un.rawAccelerometer.x;
+      accelY = sensorValue.un.rawAccelerometer.y;
+      accelZ = sensorValue.un.rawAccelerometer.z;
+
+    }
+
+    if (sensorValue.sensorId == SH2_LINEAR_ACCELERATION) {
+
+      linearAccelMagnitude = sqrt(
+        sensorValue.un.linearAcceleration.x *
+        sensorValue.un.linearAcceleration.x +
+
+        sensorValue.un.linearAcceleration.y *
+        sensorValue.un.linearAcceleration.y +
+
+        sensorValue.un.linearAcceleration.z *
+        sensorValue.un.linearAcceleration.z
+      );
+
+    }
+
+  }
 
   // Detect Steps
+  float stepThreshold = 2.0;
 
+  if (linearAccelMagnitude > stepThreshold && stepDetect == false && millis() - lastStepTime > 300) {
+    stepCount++;
+
+    stepDetect = true;
+    lastStepTime = millis();
+  }
+
+  if (linearAccelMagnitude < 1.0) {
+    stepDetect = false;
+  }
+
+  // Calculate Distance
+  distance = stepCount * strideLength;
 
   // Handle Buttons
+  if (!digitalRead(Button_D0)) {
 
+    if (currentScreen == StrideScreen) {
+      strideLength -= 0.05;
+      if (strideLength < 0.20) {
+        strideLength = 0.20;
+      }
+    } else {
+      if (currentScreen == MainScreen) {
+        currentScreen = AccelerationScreen;
+      } else {
+        // currentScreen = (screenState)(((int)currentScreen - 1) % (int)sCount);
+        currentScreen = (screenState)((int)currentScreen - 1);
+      }
+    }
+    delay(150);
+  }
+
+  if (digitalRead(Button_D1)) {
+    if (currentScreen == StrideScreen) {
+      strideLength += 0.05;
+      if (strideLength > 2.00) {
+        strideLength = 2.00;
+      }
+    } else {
+      currentScreen = (screenState)(((int)currentScreen + 1) % int(sCount));
+    }
+    delay(150);
+  }
+
+  if (digitalRead(Button_D2)) {
+    if (currentScreen == StrideScreen) {
+      currentScreen = DistanceScreen;
+    }
+    delay(150);
+  }
 
   // Screen Display
+  canvas.fillScreen(ST77XX_ORANGE);
+  canvas.setCursor(0, 20);
+  canvas.setTextColor(ST77XX_GREEN);
+      // canvas.setTextSize(2)
 
+  if (currentScreen == MainScreen) {
 
-  delay(10);
+    canvas.println("Pedometer");
+    canvas.print("Steps = ");
+    canvas.println(stepCount);
+
+  } else if (currentScreen == DistanceScreen) {
+
+    canvas.println("Distance");
+    canvas.print("Distance = ");
+    canvas.print(distance);
+    canvas.println(" m");
+
+  } else if (currentScreen == StrideScreen) {
+
+    canvas.println("Stride Length");
+    canvas.print("Stride = ");
+    canvas.print(strideLength);
+    canvas.println(" m");
+
+    canvas.println("D0 = -");
+    canvas.println("D1 = +");
+
+  } else if (currentScreen == AccelerationScreen) {
+
+    canvas.println("Raw Acceleration");
+
+    canvas.print("X = ");
+    canvas.println(accelX);
+
+    canvas.print("Y = ");
+    canvas.println(accelY);
+
+    canvas.print("Z = ");
+    canvas.println(accelZ);
+
+  }
+  display.drawRGBBitmap(0,0, canvas.getBuffer(), 240, 135);
+  delay(20);
 }
