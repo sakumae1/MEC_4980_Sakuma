@@ -131,19 +131,19 @@ void loop () {
   distance = stepCount * strideLength;
 
   // Handle Buttons
+
+  if (digitalRead(Button_D2)) {
+    currentScreen = (screenState)(((int)currentScreen + 1) % int(sCount));
+    delay(150);
+  }
+
+
   if (!digitalRead(Button_D0)) {
 
     if (currentScreen == StrideScreen) {
       strideLength -= 0.05;
       if (strideLength < 0.20) {
         strideLength = 0.20;
-      }
-    } else {
-      if (currentScreen == MainScreen) {
-        currentScreen = AccelerationScreen;
-      } else {
-        // currentScreen = (screenState)(((int)currentScreen - 1) % (int)sCount);
-        currentScreen = (screenState)((int)currentScreen - 1);
       }
     }
     delay(150);
@@ -155,15 +155,6 @@ void loop () {
       if (strideLength > 2.00) {
         strideLength = 2.00;
       }
-    } else {
-      currentScreen = (screenState)(((int)currentScreen + 1) % int(sCount));
-    }
-    delay(150);
-  }
-
-  if (digitalRead(Button_D2)) {
-    if (currentScreen == StrideScreen) {
-      currentScreen = DistanceScreen;
     }
     delay(150);
   }
