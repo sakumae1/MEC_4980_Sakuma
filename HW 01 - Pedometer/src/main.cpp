@@ -45,8 +45,8 @@ float Z = 0.0; // linear Z-direction acceleration
 
 float linearAccelMagnitude = 0.0;
 sh2_SensorValue_t sensorValue;
-bool stepDetect = false;
-unsigned long lastStepTime = 0;
+      // bool stepDetect = false;
+      // unsigned long lastStepTime = 0;
 
 // Buttons
 # define Button_D0 0
@@ -81,6 +81,7 @@ void setup() {
   accelerometer.enableReport(SH2_ACCELEROMETER, 20000);
   accelerometer.enableReport(SH2_LINEAR_ACCELERATION, 20000);
   accelerometer.enableReport(SH2_RAW_ACCELEROMETER, 20000);
+  accelerometer.enableReport(SH2_STEP_COUNTER, 20000);
 }
 
 // loop
@@ -90,6 +91,7 @@ void loop () {
     accelerometer.enableReport(SH2_ACCELEROMETER, 20000);
     accelerometer.enableReport(SH2_LINEAR_ACCELERATION, 20000);
     accelerometer.enableReport(SH2_RAW_ACCELEROMETER, 20000);
+    accelerometer.enableReport(SH2_STEP_COUNTER, 20000);
   }
 
   if (accelerometer.getSensorEvent(&sensorValue)) {
@@ -113,21 +115,28 @@ void loop () {
 
     }
 
+    if (sensorValue.sensorId == SH2_STEP_COUNTER) {
+      stepCount = sensorValue.un.stepCounter.steps;
+    }
   }
 
-  // Detect Steps
-  float stepThreshold = .70;
 
-  if (linearAccelMagnitude > stepThreshold && stepDetect == false && millis() - lastStepTime > 300) {
-    stepCount++;
+/*
+      // Detect Steps
+      float stepThreshold = .70;
 
-    stepDetect = true;
-    lastStepTime = millis();
-  }
+      if (linearAccelMagnitude > stepThreshold && stepDetect == false && millis() - lastStepTime > 300) {
+        stepCount++;
 
-  if (linearAccelMagnitude < 1.0) {
-    stepDetect = false;
-  }
+        stepDetect = true;
+        lastStepTime = millis();
+      }
+
+      if (linearAccelMagnitude < 1.0) {
+        stepDetect = false;
+      }
+*/
+
 
   // Calculate Distance
   distance = stepCount * strideLength;
@@ -207,6 +216,7 @@ void loop () {
   display.drawRGBBitmap(0,0, canvas.getBuffer(), 240, 135);
   
   Serial.println(linearAccelMagnitude);
+  Serial.println(stepCount);
 
   delay(30);
   
