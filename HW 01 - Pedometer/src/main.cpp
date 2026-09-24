@@ -35,9 +35,14 @@ screenState currentScreen = MainScreen;
 int stepCount = 0;
 float strideLength = 0.75;
 float distance = 0.0;
-float accelX = 0.0;
-float accelY = 0.0;
-float accelZ = 0.0;
+float accelX = 0.0; // raw X-direction acceleration
+float accelY = 0.0; // raw Y-direction acceleration
+float accelZ = 0.0; // raw Z-direction acceleration
+float X = 0.0; // linear X-direction acceleration
+float Y = 0.0; // linear Y-direction acceleration
+float Z = 0.0; // linear Z-direction acceleration
+
+
 float linearAccelMagnitude = 0.0;
 sh2_SensorValue_t sensorValue;
 bool stepDetect = false;
@@ -98,23 +103,20 @@ void loop () {
 
     if (sensorValue.sensorId == SH2_LINEAR_ACCELERATION) {
 
-      linearAccelMagnitude = sqrt(
-        sensorValue.un.linearAcceleration.x *
-        sensorValue.un.linearAcceleration.x +
+      X = sensorValue.un.linearAcceleration.x;
 
-        sensorValue.un.linearAcceleration.y *
-        sensorValue.un.linearAcceleration.y +
+      Y = sensorValue.un.linearAcceleration.y;
 
-        sensorValue.un.linearAcceleration.z *
-        sensorValue.un.linearAcceleration.z
-      );
+      Z = sensorValue.un.linearAcceleration.z;
+      
+      linearAccelMagnitude = sqrt(X*X + Y*Y + Z*Z);
 
     }
 
   }
 
   // Detect Steps
-  float stepThreshold = 2.0;
+  float stepThreshold = .70;
 
   if (linearAccelMagnitude > stepThreshold && stepDetect == false && millis() - lastStepTime > 300) {
     stepCount++;
@@ -203,5 +205,9 @@ void loop () {
 
   }
   display.drawRGBBitmap(0,0, canvas.getBuffer(), 240, 135);
-  delay(20);
+  
+  Serial.println(linearAccelMagnitude);
+
+  delay(30);
+  
 }
