@@ -119,8 +119,8 @@ void loop () {
 
     if (currentScreen == StrideScreen) {
       strideLength -= 0.05;
-      if (strideLength < 0.20) {
-        strideLength = 0.20;
+      if (strideLength < 0.50) {
+        strideLength = 0.50;
       }
     }
     delay(150);
@@ -130,8 +130,8 @@ void loop () {
   if (digitalRead(Button_D1)) {
     if (currentScreen == StrideScreen) {
       strideLength += 0.05;
-      if (strideLength > 2.00) {
-        strideLength = 2.00;
+      if (strideLength > 1.00) {
+        strideLength = 1.00;
       }
     }
     delay(150);
