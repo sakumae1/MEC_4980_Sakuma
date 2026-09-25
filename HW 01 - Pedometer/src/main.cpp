@@ -8,9 +8,9 @@
 
 #include <Wire.h>
 #include <SPI.h>
-#include <Adafruit_Sensor.h> // do we need this??????????
+#include <Adafruit_Sensor.h>
 #include <Adafruit_BNO08x.h>
-#include <Arduino.h> // do we need this?????????
+#include <Arduino.h>
 #include <Adafruit_ST7789.h>
 
 // Display
