@@ -1,16 +1,16 @@
 // Creates a pedometer with a state machine approach
 // Screens
   // Main Screen: Step Counter
-  // Second Screen: Approximate Distance Based on Stride Length
-  // Third Screen: Adjust Stride Length
-  // Fourth Screen: Raw Accleration Values (ax, ay, az)
+  // Second Screen: Distance Traveled Based on Stride Length
+  // Third Screen: Adjusts Stride Length
+  // Fourth Screen: Raw Accleration Values (accelX, accelY, accelZ)
 
 
 #include <Wire.h>
 #include <SPI.h>
-#include <Adafruit_Sensor.h>
-#include "Adafruit_BNO08x.h"
-#include <Arduino.h>
+#include <Adafruit_Sensor.h> // do we need this??????????
+#include <Adafruit_BNO08x.h>
+#include <Arduino.h> // do we need this?????????
 #include <Adafruit_ST7789.h>
 
 // Display
@@ -38,15 +38,8 @@ float distance = 0.0;
 float accelX = 0.0; // raw X-direction acceleration
 float accelY = 0.0; // raw Y-direction acceleration
 float accelZ = 0.0; // raw Z-direction acceleration
-float X = 0.0; // linear X-direction acceleration
-float Y = 0.0; // linear Y-direction acceleration
-float Z = 0.0; // linear Z-direction acceleration
 
-
-float linearAccelMagnitude = 0.0;
 sh2_SensorValue_t sensorValue;
-      // bool stepDetect = false;
-      // unsigned long lastStepTime = 0;
 
 // Buttons
 # define Button_D0 0
@@ -78,19 +71,18 @@ void setup() {
   }
   Serial.println("BNO085 found!");
 
-  accelerometer.enableReport(SH2_ACCELEROMETER, 20000);
-  accelerometer.enableReport(SH2_LINEAR_ACCELERATION, 20000);
   accelerometer.enableReport(SH2_RAW_ACCELEROMETER, 20000);
   accelerometer.enableReport(SH2_STEP_COUNTER, 20000);
 }
 
 // loop
 void loop () {
-  // Read accelerometer
+  // *Read accelerometer*
   if (accelerometer.wasReset()) {
-    accelerometer.enableReport(SH2_ACCELEROMETER, 20000);
-    accelerometer.enableReport(SH2_LINEAR_ACCELERATION, 20000);
+    // read raw accelerometer data from the sensor
     accelerometer.enableReport(SH2_RAW_ACCELEROMETER, 20000);
+
+    // read steps data from the sensor
     accelerometer.enableReport(SH2_STEP_COUNTER, 20000);
   }
 
@@ -103,52 +95,26 @@ void loop () {
 
     }
 
-    if (sensorValue.sensorId == SH2_LINEAR_ACCELERATION) {
 
-      X = sensorValue.un.linearAcceleration.x;
-
-      Y = sensorValue.un.linearAcceleration.y;
-
-      Z = sensorValue.un.linearAcceleration.z;
-      
-      linearAccelMagnitude = sqrt(X*X + Y*Y + Z*Z);
-
-    }
-
+    // *Detect Steps*
     if (sensorValue.sensorId == SH2_STEP_COUNTER) {
       stepCount = sensorValue.un.stepCounter.steps;
     }
   }
 
 
-/*
-      // Detect Steps
-      float stepThreshold = .70;
-
-      if (linearAccelMagnitude > stepThreshold && stepDetect == false && millis() - lastStepTime > 300) {
-        stepCount++;
-
-        stepDetect = true;
-        lastStepTime = millis();
-      }
-
-      if (linearAccelMagnitude < 1.0) {
-        stepDetect = false;
-      }
-*/
-
-
-  // Calculate Distance
+  // *Calculate Distance*
   distance = stepCount * strideLength;
 
-  // Handle Buttons
 
+  // *Handle Buttons*
+  // Change Screen
   if (digitalRead(Button_D2)) {
     currentScreen = (screenState)(((int)currentScreen + 1) % int(sCount));
     delay(150);
   }
 
-
+  // decrease stride length
   if (!digitalRead(Button_D0)) {
 
     if (currentScreen == StrideScreen) {
@@ -160,6 +126,7 @@ void loop () {
     delay(150);
   }
 
+  // increase stride length
   if (digitalRead(Button_D1)) {
     if (currentScreen == StrideScreen) {
       strideLength += 0.05;
@@ -170,28 +137,31 @@ void loop () {
     delay(150);
   }
 
-  // Screen Display
+  // *Screen Display*
   canvas.fillScreen(ST77XX_ORANGE);
   canvas.setCursor(0, 20);
   canvas.setTextColor(ST77XX_GREEN);
-      // canvas.setTextSize(2)
+  canvas.setTextSize(2);
 
   if (currentScreen == MainScreen) {
 
     canvas.println("Pedometer");
+    canvas.println(" ");
     canvas.print("Steps = ");
     canvas.println(stepCount);
 
   } else if (currentScreen == DistanceScreen) {
 
-    canvas.println("Distance");
+    canvas.println("Distance Traveled");
+    canvas.println(" ");
     canvas.print("Distance = ");
     canvas.print(distance);
     canvas.println(" m");
 
   } else if (currentScreen == StrideScreen) {
 
-    canvas.println("Stride Length");
+    canvas.println("Stride Length"); // Heel-to-Heel Distance Between Opposite Feet
+    canvas.println(" ");
     canvas.print("Stride = ");
     canvas.print(strideLength);
     canvas.println(" m");
@@ -202,6 +172,8 @@ void loop () {
   } else if (currentScreen == AccelerationScreen) {
 
     canvas.println("Raw Acceleration");
+    canvas.println("(Unscaled Direct ADC Readings)");
+    canvas.println(" ");
 
     canvas.print("X = ");
     canvas.println(accelX);
@@ -214,10 +186,7 @@ void loop () {
 
   }
   display.drawRGBBitmap(0,0, canvas.getBuffer(), 240, 135);
-  
-  Serial.println(linearAccelMagnitude);
-  Serial.println(stepCount);
 
-  delay(30);
+  delay(10);
   
 }
