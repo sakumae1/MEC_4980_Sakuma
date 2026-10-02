@@ -4,24 +4,26 @@
 #include <esp32-hal-ledc.h>
 
 // Motor Pins
-int ch1 = 0;
-int ch2 = 1;
+  //int ch1 = 0;
+  //int ch2 = 1;
 
-#define MotorPin1 9
-#define MotorPin2 10
+  //#define MotorPin1 9
+  //#define MotorPin2 10
+
+  int ch1 = 9;
+  int ch2 = 10;
 
 // Encoder
 #define Pin_Encoder A5
-      // #define PIN_OUTPUT 3
 
-#define EncoderSlots 10
+#define EncoderSlots 5
 
 // set sample time
-#define sample_time 100
+#define sample_time 10
 
 // photoresistor thresholds
-#define dark 1200
-#define light 1800
+#define dark 2000
+#define light 3000
 
 //PID variables
 double Setpoint, Input, Output;
@@ -39,8 +41,8 @@ void setup()
 {
   Serial.begin(9600);
 
-  ledcAttachPin(MotorPin1, ch1);
-  ledcAttachPin(MotorPin2, ch2);
+  //ledcAttachPin(MotorPin1, ch1);
+  //ledcAttachPin(MotorPin2, ch2);
 
   analogReadResolution(12);
   pinMode(Pin_Encoder, INPUT);
@@ -50,7 +52,7 @@ void setup()
   Input = 0;
 
   // target motor speed
-  Setpoint = 100;
+  Setpoint = 25;
 
   // PID
   myPID.SetOutputLimits(0,255);
@@ -91,7 +93,7 @@ void loop()
     // convert pulses to revs
     double Revolutions = (double)NewCounts / EncoderSlots;
 
-    // revs per 100ms to revs per min
+    // revs per 10ms to revs per min
     Input = Revolutions*(60000/sample_time);
 
     // save encoder count
@@ -100,24 +102,25 @@ void loop()
     // PID
     myPID.Compute();
 
-    ledcWrite(ch1, (int)Output);
-    ledcWrite(ch2, 0);
+    analogWrite(ch1, (int)Output);
+      // analogWrite(ch1, Setpoint);
+    analogWrite(ch2, 0);
 
     // display info
     Serial.print("Light: ");
     Serial.print(LightLevel);
 
     Serial.print(" | Counts: ");
-    Serial.print(LightLevel);
+    Serial.print(EncoderCount);
 
     Serial.print(" | RPM: ");
-    Serial.print(Setpoint);
+    Serial.print(Input);
 
     Serial.print(" | Target RPM: ");
     Serial.print(Setpoint);
 
-    Serial.print(" | PWM: ");
-    Serial.println(Output);
+    // Serial.print(" | PWM: ");
+    // Serial.println(Output);
 
     PreviousTime = CurrentTime;
   }
