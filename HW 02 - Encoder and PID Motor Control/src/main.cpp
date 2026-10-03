@@ -32,10 +32,15 @@ PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 // encoder variables
 unsigned long EncoderCount = 0;
-unsigned long PreviousEncoderCount = 0;
+// unsigned long PreviousEncoderCount = 0;
 unsigned long PreviousTime = 0;
+unsigned long LastPulseTime = 0;
+unsigned long PulsePeriod = 0;
+
+// double MeasuredRPM = 0;
 
 bool LightState = false;
+bool FirstPulse = true;
 
 void setup()
 {
@@ -76,11 +81,30 @@ void loop()
 
     // one slot passed
     EncoderCount++;
+
+    unsigned long CurrentPulseTime = millis();
+
+    if (!FirstPulse) {
+      PulsePeriod = CurrentPulseTime - LastPulseTime;
+        if (PulsePeriod > 0) {
+      Input = 60000.0 / (PulsePeriod*EncoderSlots);
+      }
+    }
+    LastPulseTime = CurrentPulseTime;
+    FirstPulse = false;
   }
 
-  if (LightState && LightLevel <= dark) {
-    LightState = false;
-  }
+  
+
+    if (LightState && LightLevel <= dark) {
+      LightState = false;
+    }
+
+    /*
+    if (!FirstPulse && (millis() - LastPulseTime > 3000)) {
+      Input = 0;
+    }
+    */
 
   // calculate RPM
   unsigned long CurrentTime = millis();
@@ -88,16 +112,18 @@ void loop()
   if (CurrentTime - PreviousTime >= sample_time) {
 
     // encoder pulses
-    unsigned long NewCounts = EncoderCount - PreviousEncoderCount;
+    // unsigned long NewCounts = EncoderCount - PreviousEncoderCount;
 
-    // convert pulses to revs
-    double Revolutions = (double)NewCounts / EncoderSlots;
+    /*
+      // convert pulses to revs
+      double Revolutions = (double)NewCounts / EncoderSlots;
 
-    // revs per 10ms to revs per min
-    Input = Revolutions*(60000/sample_time);
+      // revs per 10ms to revs per min
+      Input = Revolutions*(60000/sample_time);
+    */
 
     // save encoder count
-    PreviousEncoderCount = EncoderCount;
+    // PreviousEncoderCount = EncoderCount;
 
     // PID
     myPID.Compute();
@@ -106,22 +132,33 @@ void loop()
       // analogWrite(ch1, Setpoint);
     analogWrite(ch2, 0);
 
-    // display info
-    Serial.print("Light: ");
-    Serial.print(LightLevel);
-
-    Serial.print(" | Counts: ");
-    Serial.print(EncoderCount);
-
-    Serial.print(" | RPM: ");
-    Serial.print(Input);
-
-    Serial.print(" | Target RPM: ");
-    Serial.print(Setpoint);
-
-    // Serial.print(" | PWM: ");
-    // Serial.println(Output);
-
     PreviousTime = CurrentTime;
+
+    static unsigned long LastPrintTime = 0;
+
+    // display info
+    if (CurrentTime - LastPrintTime >= 200) {
+
+      Serial.print("Light: ");
+      Serial.print(LightLevel);
+
+      Serial.print(" | Counts: ");
+      Serial.print(EncoderCount);
+
+      Serial.print(" | Period: ");
+      Serial.print(PulsePeriod);
+      Serial.print(" ms");
+
+      Serial.print(" | RPM: ");
+      Serial.print(Input);
+
+      Serial.print(" | Target RPM: ");
+      Serial.print(Setpoint);
+
+      Serial.print(" | PWM: ");
+      Serial.println(Output);
+
+      LastPrintTime = CurrentTime;
+    }
   }
 }
