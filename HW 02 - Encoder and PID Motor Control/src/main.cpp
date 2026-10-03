@@ -27,7 +27,7 @@
 
 //PID variables
 double Setpoint, Input, Output;
-double Kp=2, Ki=5, Kd=1;
+double Kp=1, Ki=0.5, Kd=0;
 PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 // encoder variables
@@ -56,7 +56,7 @@ void setup()
   Input = 0;
 
   // target motor speed
-  Setpoint = 25;
+  Setpoint = 100;
 
   // PID
   myPID.SetOutputLimits(0,255);
@@ -71,67 +71,54 @@ void setup()
 
 void loop()
 {
-  // read photoresitor
+  // PID calculates the required PWM
+  myPID.Compute();
+
+  analogWrite(ch1, (int)Output);
+  analogWrite(ch2, 0);
+
+  // Read photoresistor
   int LightLevel = analogRead(Pin_Encoder);
 
-  // detect encoder slots
-  if (!LightState && LightLevel >= light){
+  // Detect light transition
+  if (!LightState && LightLevel >= light) {
     LightState = true;
-
-    // one slot passed
     EncoderCount++;
+
     unsigned long CurrentPulseTime = millis();
 
+    // Calculate time between encoder pulses
     if (!FirstPulse) {
       PulsePeriod = CurrentPulseTime - LastPulseTime;
 
       if (PulsePeriod > 0) {
-        Input = 60000.0/((double)PulsePeriod*EncoderSlots);
+        Input = 60000.0 / ((double)PulsePeriod * EncoderSlots);
       }
     }
+
     LastPulseTime = CurrentPulseTime;
     FirstPulse = false;
   }
 
+  // Detect dark transition
   if (LightState && LightLevel <= dark) {
     LightState = false;
   }
 
-  // calculate RPM
-  unsigned long CurrentTime = millis();
+  // Print every 200 ms
+  static unsigned long LastPrintTime = 0;
 
-  if (CurrentTime - PreviousTime >= sample_time) {
-    /*
-      // encoder pulses
-      unsigned long NewCounts = EncoderCount - PreviousEncoderCount;
+  if (millis() - LastPrintTime >= 200) {
 
-      // convert pulses to revs
-      double Revolutions = (double)NewCounts / EncoderSlots;
-
-      // revs per 10ms to revs per min
-      Input = Revolutions*(60000/sample_time);
-
-      // save encoder count
-      PreviousEncoderCount = EncoderCount;
-    */
-
-    // PID
-
-    analogWrite(ch1, 150);
-    analogWrite(ch2, 0);
-        /*
-        myPID.Compute();
-
-        analogWrite(ch1, (int)Output);
-        analogWrite(ch2, 0);
-        */
-
-    // display info
     Serial.print("Light: ");
     Serial.print(LightLevel);
 
     Serial.print(" | Counts: ");
     Serial.print(EncoderCount);
+
+    Serial.print(" | Period: ");
+    Serial.print(PulsePeriod);
+    Serial.print(" ms");
 
     Serial.print(" | RPM: ");
     Serial.print(Input);
@@ -140,8 +127,10 @@ void loop()
     Serial.print(Setpoint);
 
     Serial.print(" | PWM: ");
-    Serial.println(150);
+    Serial.println(Output);
 
-    PreviousTime = CurrentTime;
+    LastPrintTime = millis();
   }
+
+  delay(10);
 }
