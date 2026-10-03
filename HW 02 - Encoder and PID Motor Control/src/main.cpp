@@ -4,14 +4,8 @@
 #include <esp32-hal-ledc.h>
 
 // Motor Pins
-  //int ch1 = 0;
-  //int ch2 = 1;
-
-  //#define MotorPin1 9
-  //#define MotorPin2 10
-
-  int ch1 = 9;
-  int ch2 = 10;
+int ch1 = 9;
+int ch2 = 10;
 
 // Encoder
 #define Pin_Encoder A5
@@ -32,7 +26,6 @@ PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 // encoder variables
 unsigned long EncoderCount = 0;
-  // unsigned long PreviousEncoderCount = 0;
 unsigned long PreviousTime = 0;
 
 unsigned long LastPulseTime = 0;
@@ -44,9 +37,6 @@ bool FirstPulse = true;
 void setup()
 {
   Serial.begin(9600);
-
-  //ledcAttachPin(MotorPin1, ch1);
-  //ledcAttachPin(MotorPin2, ch2);
 
   analogReadResolution(12);
   pinMode(Pin_Encoder, INPUT);
@@ -65,8 +55,6 @@ void setup()
 
   // start timer
   PreviousTime = millis();
-
-
 }
 
 void loop()
