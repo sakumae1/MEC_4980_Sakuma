@@ -10,19 +10,22 @@ int ch2 = 10;
 // Encoder
 #define Pin_Encoder A5
 
+// Specify Number of Encoder Slots
 #define EncoderSlots 5
 
 // set sample time
 #define sample_time 10
 
-// photoresistor thresholds
+// photoresistor thresholds (I found these through some experimentation)
 #define dark 2000
 #define light 3000
 
 //PID variables
-double Setpoint, Input, Output;
-double Kp=1, Ki=0.5, Kd=0;
-PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+  double Setpoint, Input, Output;
+
+  // "Tuned" PID variables
+  double Kp=1, Ki=0.5, Kd=0;
+  PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 // encoder variables
 unsigned long EncoderCount = 0;
