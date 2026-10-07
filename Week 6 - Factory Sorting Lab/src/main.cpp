@@ -1,4 +1,5 @@
 #include <P1AM.h>
+#include <math.h>
 
 int modInput = 1;
 int modOutput = 2;
@@ -11,6 +12,9 @@ int pinBW = 4;
 int pinBR = 5;
 int pinBB = 6;
 
+int linkageDistances[] = {3, 7, 12};
+int valvePins[] = {3, 4, 5};
+
 enum MachineStates {
   REST,
   SENSE,
@@ -18,6 +22,15 @@ enum MachineStates {
   ACTUATE,
   COUNT
 };
+
+enum Colors {
+  WHITE,
+  RED,
+  BLUE,
+  COLORCOUNT
+};
+
+Colors targetColor = WHITE;
 
 MachineStates mState = REST;
 
@@ -35,37 +48,87 @@ void TurnEverythingOff() {
   }
 }
 
+void ToggleConveyor(bool onOffState) {
+  P1.writeDiscrete(onOffState, modOutput, 1);
+}
+
+void ToggleCompressor(bool onOffState) {
+  P1.writeDiscrete(onOffState, modOutput, 2);
+}
+
+void UpdateRobotArmOutputs() {
+  for (int i = 4; i < 7; i++) {
+  P1.writeDiscrete(P1.readDiscrete(modInput, i), modOutput, i+2);
+  }
+}
+
 int channelTwo;
 int color = 0;
+int linkageCount = 0;
+bool prevKeyState = false; // could also be set to 0
+bool currentState = false;
+int distanceToMove = 8;
+int defWrongColor = 10000;
+int currentColor = 10000;
+
 void loop() {
-
-  switch (mState)
-  {
-  case MachineStates::REST:
-    TurnEverythingOff();
-    if(!P1.ReadDiscrete(modInput, pinLB1)) {
-      mState = MachineStates::SENSE;
-    }
+  UpdateRobotArmOutputs();
+  switch (mState) {
+    case MachineStates::REST:
+      TurnEverythingOff();
+      Serial.print("Rest state");
+      // check to see if LB1 is broken
+      if(!P1.readDiscrete(modInput, pinLB1)) {
+        Serial.print("Switching State");
+        // Switch states
+        mState = MachineStates::SENSE;
+      }
     break;
-  case MachineStates::SENSE:
-    P1.writeDiscrete(modOutput, 1);
+    case MachineStates::SENSE:
+    // to-do: determine color
+      currentColor = min(currentColor, P1.readAnalog(modAnalogIn, 1));
+      Serial.print("Sense State, min color is: ");
+      Serial.println(currentColor);
+      ToggleConveyor(HIGH);
+      // Wait for LB2 to be triggered
+      if(!P1.readDiscrete(modInput, pinLB2)) {
+        Serial.print("Tracking State");
+        mState = MachineStates::TRACKER;
+        if (currentColor < 3000) {
+          targetColor = Colors::WHITE;
+        } else if (currentColor < 4800) {
+          targetColor = Colors::RED;
+        } else {
+          targetColor = Colors::BLUE;
+        }
+      }
+    break;
+    case MachineStates::TRACKER:
+      Serial.print("Tracker State for color ");
+      Serial.println(linkageCount);
+      // to-do: turn on compressor
+      ToggleCompressor(HIGH);
+      currentState = (bool)P1.readDiscrete(modInput, pulseKey);
+      if (!prevKeyState && currentState) {
+        linkageCount++;
+      }
+      prevKeyState = currentState;
+      if (linkageCount > linkageDistances[(int)targetColor]) {
+        Serial.print("Switching State");
+        mState = MachineStates::ACTUATE;
+      }
+    break;
+    case MachineStates::ACTUATE:
+      Serial.print("Actuate State");
+      ToggleConveyor(LOW);
+      P1.writeDiscrete(HIGH, modOutput, valvePins[(int)targetColor]);
+      delay(1000);
+      mState = MachineStates::REST;
+      currentColor = defWrongColor;
+      linkageCount = 0;
     break;
   
-  default:
+    case MachineStates::COUNT:
     break;
-  }
-
-	Serial.print("Pulse, 1, 2, W, R, B, color:");
-  for (int i = 1; i < 7; i++) {
-    channelTwo = P1.readDiscrete(modInput, i);	
-	  Serial.print(channelTwo);
-    Serial.print(", ");
-
-  }
-
-  P1.readAnalog(modAnalogIn, 1);
-	Serial.println(color);
-	
- 
-  
+  }  
 }
