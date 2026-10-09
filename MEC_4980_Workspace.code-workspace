@@ -1,0 +1,41 @@
+{
+	"folders": [
+		{
+			"name": "MEC-4980_Lab01",
+			"path": "../MEC 4980 - Lab 01/MEC-4980_Lab01"
+		},
+		{
+			"name": "Week 01 - From Scratch",
+			"path": "../Week 01 - From Scratch"
+		},
+		{
+			"name": "Week 02 Lab - Analog Input",
+			"path": "Week 02 Lab - Analog Input"
+		},
+		{
+			"name": "Lab 03 - Thermostat",
+			"path": "Lab 03 - Thermostat"
+		},
+		{
+			"name": "HW 01 - Pedometer",
+			"path": "HW 01 - Pedometer"
+		},
+		{
+			"name": "Lab 04 - Visual Level",
+			"path": "Lab 04 - Visual Level"
+		},
+		{
+			"name": "Week 04 - Example - Make motors go",
+			"path": "Week 04 - Example - Make motors go"
+		},
+		{
+			"name": "HW 02 - Encoder and PID Motor Control",
+			"path": "HW 02 - Encoder and PID Motor Control"
+		},
+		{
+			"name": "Week 6 - Factory Sorting Lab",
+			"path": "Week 6 - Factory Sorting Lab"
+		}
+	],
+	"settings": {}
+}
