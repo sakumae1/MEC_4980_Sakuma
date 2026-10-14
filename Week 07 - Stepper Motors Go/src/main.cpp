@@ -12,6 +12,7 @@ hw_timer_t *stepTimer = NULL;
 
 void ARDUINO_ISR_ATTR toggleStep() {
   shouldStep = !shouldStep;
+  digitalWrite(pinStep, shouldStep);
 }
 
 void setup() {
@@ -19,11 +20,11 @@ void setup() {
   pinMode(pinDir, OUTPUT);
 
   stepTimer = timerBegin(stepFreq);
-  timerAttachInterrupt(stepTimer, &toggleStep);
-  timerAlarm(stepTimer, stepFreq, true, 0);
+  timerAttachInterrupt(stepTimerm, &toggleStep);
+  timerAlarm(stepTimer, 1, true, 0);
 }
 
 void loop() {
-  digitalWrite(pinStep, shouldStep);
+  
 }
 
