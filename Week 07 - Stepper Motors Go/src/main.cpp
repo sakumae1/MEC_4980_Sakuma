@@ -1,30 +1,26 @@
 #include <Arduino.h>
+#include <AccelStepper>
 
 int pinStep = 9;
 int pinDir = 10;
 
-volatile bool shouldStep = false;
-bool doneStepping = true;
+AccelStepper onlyAxis(1, pinStep, pinDir);
 
-long stepFreq = 200*2; // *2 for including off portion of signal
-
-hw_timer_t *stepTimer = NULL;
-
-void ARDUINO_ISR_ATTR toggleStep() {
-  shouldStep = !shouldStep;
-  digitalWrite(pinStep, shouldStep);
-}
 
 void setup() {
   pinMode(pinStep, OUTPUT);
   pinMode(pinDir, OUTPUT);
 
-  stepTimer = timerBegin(stepFreq);
-  timerAttachInterrupt(stepTimerm, &toggleStep);
-  timerAlarm(stepTimer, 1, true, 0);
+  onlyAxis.setMaxSpeed(10000);
+  onlyAxis.setSpeed(300);
+  onlyAxis.setAcceleration(10000);
 }
 
 void loop() {
-  
+  onlyAxis.runToNewPosition(200);
+  delay(1000);
+  onlyAxis.runToNewPosition(200);
+  onlyAxis.stop();
+  delay(500);
 }
 
