@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <AccelStepper>
+#include <AccelStepper.h>
 
 int pinStep = 9;
 int pinDir = 10;
