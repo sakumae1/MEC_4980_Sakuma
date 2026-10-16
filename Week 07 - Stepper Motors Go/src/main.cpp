@@ -19,7 +19,7 @@ void setup() {
 void loop() {
   onlyAxis.runToNewPosition(200);
   delay(1000);
-  onlyAxis.runToNewPosition(200);
+  onlyAxis.runToNewPosition(-200);
   onlyAxis.stop();
   delay(500);
 }
