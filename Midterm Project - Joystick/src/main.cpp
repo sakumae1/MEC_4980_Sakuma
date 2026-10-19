@@ -85,41 +85,38 @@ float normalizeAxis(int raw, int center, bool invert)
 
     if (raw >= center)
     {
-        float range = (float)(ADC_MAX_VALUE - center);
-
-        value = (range > 0.0f)
-                    ? (raw - center) / range
-                    : 0.0f;
+        value = (float)(raw - center) / (4095 - center);
     }
     else
     {
-        float range = (float)center;
-
-        value = (range > 0.0f)
-                    ? (raw - center) / range
-                    : 0.0f;
+        value = (float)(raw - center) / center;
     }
-
-    value = constrain(value, -1.0f, 1.0f);
 
     if (invert)
     {
         value = -value;
     }
 
-    // Apply dead zone.
-    float magnitude = fabsf(value);
+    // Clamp to the valid output range.
+    if (value > 1.0f) value = 1.0f;
+    if (value < -1.0f) value = -1.0f;
 
-    if (magnitude <= DEAD_ZONE)
+    // Ignore small movements around the center.
+    const float deadZone = 0.08f;
+
+    if (fabs(value) < deadZone)
     {
-        return 0.0f;
+        value = 0.0f;
+    }
+    else
+    {
+        // Rescale so output smoothly spans 0 to 1 outside the dead zone.
+        value = (value > 0)
+            ? (value - deadZone) / (1.0f - deadZone)
+            : (value + deadZone) / (1.0f - deadZone);
     }
 
-    // Rescale remaining travel to the full output range.
-    float scaled =
-        (magnitude - DEAD_ZONE) / (1.0f - DEAD_ZONE);
-
-    return copysignf(scaled, value);
+    return value;
 }
 
 // =====================================================
@@ -175,7 +172,7 @@ void loop()
 {
     uint32_t now = millis();
 
-    // Read joystick at approximately 50 Hz.
+    // Sample joystick at approximately 50 Hz.
     if (now - lastSampleMs >= SAMPLE_INTERVAL_MS)
     {
         lastSampleMs = now;
@@ -189,7 +186,7 @@ void loop()
         float targetY =
             normalizeAxis(rawY, centerY, INVERT_Y);
 
-        // Low-pass filter to reduce noise.
+        // Smooth the readings.
         filteredX +=
             FILTER_ALPHA * (targetX - filteredX);
 
@@ -197,6 +194,13 @@ void loop()
             FILTER_ALPHA * (targetY - filteredY);
 
         updateButton();
+
+        // Save the latest raw readings for printing.
+        static int latestRawX = 0;
+        static int latestRawY = 0;
+
+        latestRawX = rawX;
+        latestRawY = rawY;
     }
 
     // Print at approximately 10 Hz.
@@ -204,8 +208,14 @@ void loop()
     {
         lastPrintMs = now;
 
+        // Read current raw values for diagnostic output.
+        int rawX = analogRead(JOY_X_PIN);
+        int rawY = analogRead(JOY_Y_PIN);
+
         Serial.printf(
-            "x=%.3f,y=%.3f,button=%d\n",
+            "Raw X: %d, Raw Y: %d | x=%.3f, y=%.3f, button=%d\n",
+            rawX,
+            rawY,
             filteredX,
             filteredY,
             buttonStable ? 1 : 0
