@@ -1,224 +1,145 @@
 #include <Arduino.h>
 #include <math.h>
 
-// =====================================================
-// PIN CONFIGURATION
-// Adafruit ESP32-S3 Reverse TFT Feather
-// =====================================================
+// Joystick inputs
 constexpr int JOY_X_PIN  = A0;
 constexpr int JOY_Y_PIN  = A1;
-constexpr int JOY_SW_PIN = 5;  // D5
+constexpr int JOY_SW_PIN = 9;   // Button moved from D5 to D9
 
-// =====================================================
-// CONFIGURATION
-// =====================================================
-constexpr uint32_t SAMPLE_INTERVAL_MS = 20;  // 50 Hz
-constexpr uint32_t PRINT_INTERVAL_MS  = 100; // 10 Hz
-constexpr uint32_t DEBOUNCE_MS        = 30;
+// UART pins for communication with the motor Feather
+constexpr int UART_RX_PIN = 5;  // D5
+constexpr int UART_TX_PIN = 6;  // D6
 
-constexpr int ADC_MAX_VALUE = 4095; // 12-bit ADC
+constexpr uint32_t USB_BAUD  = 115200;
+constexpr uint32_t UART_BAUD = 9600;
 
-// Joystick center measured during startup.
-int centerX = 2048;
-int centerY = 2048;
+constexpr uint32_t SEND_INTERVAL_MS = 20;  // 50 Hz
+constexpr uint32_t DEBUG_INTERVAL_MS = 100;
 
-// Ignore small movements around joystick center.
 constexpr float DEAD_ZONE = 0.08f;
-
-// Analog smoothing: larger values respond faster.
 constexpr float FILTER_ALPHA = 0.25f;
 
-// Change these if an axis moves in the wrong direction.
 constexpr bool INVERT_X = false;
 constexpr bool INVERT_Y = true;
 
-// =====================================================
-// STATE VARIABLES
-// =====================================================
+constexpr uint32_t DEBOUNCE_MS = 30;
+
+float centerX = 2048.0f;
+float centerY = 2048.0f;
+
 float filteredX = 0.0f;
 float filteredY = 0.0f;
 
-uint32_t lastSampleMs = 0;
-uint32_t lastPrintMs = 0;
-
 bool buttonStable = false;
 bool buttonLastReading = false;
-uint32_t buttonChangeMs = 0;
+uint32_t buttonChangeTime = 0;
 
-// =====================================================
-// CALIBRATE JOYSTICK CENTER
-// Keep the joystick untouched during startup.
-// =====================================================
-void calibrateJoystick()
-{
-    constexpr int NUM_SAMPLES = 100;
+uint32_t lastSendTime = 0;
+uint32_t lastDebugTime = 0;
 
-    long sumX = 0;
-    long sumY = 0;
+float readAxis(int pin, float center, bool invert) {
+    int raw = analogRead(pin);
 
-    Serial.println(
-        "Calibrating joystick. Leave it centered..."
-    );
+    float value = (raw - center) / 2048.0f;
+    value = constrain(value, -1.0f, 1.0f);
 
-    for (int i = 0; i < NUM_SAMPLES; ++i)
-    {
-        sumX += analogRead(JOY_X_PIN);
-        sumY += analogRead(JOY_Y_PIN);
-        delay(5);
-    }
-
-    centerX = sumX / NUM_SAMPLES;
-    centerY = sumY / NUM_SAMPLES;
-
-    Serial.printf(
-        "Center X: %d, Center Y: %d\n",
-        centerX, centerY
-    );
-}
-
-// =====================================================
-// NORMALIZE ANALOG INPUT TO -1.0 ... +1.0
-// =====================================================
-float normalizeAxis(int raw, int center, bool invert)
-{
-    float value;
-
-    if (raw >= center)
-    {
-        value = (float)(raw - center) / (4095 - center);
-    }
-    else
-    {
-        value = (float)(raw - center) / center;
-    }
-
-    if (invert)
-    {
-        value = -value;
-    }
-
-    // Clamp to the valid output range.
-    if (value > 1.0f) value = 1.0f;
-    if (value < -1.0f) value = -1.0f;
-
-    // Ignore small movements around the center.
-    const float deadZone = 0.08f;
-
-    if (fabs(value) < deadZone)
-    {
+    if (fabsf(value) < DEAD_ZONE) {
         value = 0.0f;
+    } else {
+        // Rescale the remaining range so output still reaches full scale.
+        float magnitude = (fabsf(value) - DEAD_ZONE)
+                        / (1.0f - DEAD_ZONE);
+        value = copysignf(magnitude, value);
     }
-    else
-    {
-        // Rescale so output smoothly spans 0 to 1 outside the dead zone.
-        value = (value > 0)
-            ? (value - deadZone) / (1.0f - deadZone)
-            : (value + deadZone) / (1.0f - deadZone);
+
+    if (invert) {
+        value = -value;
     }
 
     return value;
 }
 
-// =====================================================
-// READ AND DEBOUNCE JOYSTICK BUTTON
-// INPUT_PULLUP means pressed = LOW.
-// =====================================================
-void updateButton()
-{
-    bool reading = (digitalRead(JOY_SW_PIN) == LOW);
-    uint32_t now = millis();
+void calibrateJoystick() {
+    // Leave the joystick centered during startup.
+    constexpr int samples = 100;
+    uint32_t sumX = 0;
+    uint32_t sumY = 0;
 
-    if (reading != buttonLastReading)
-    {
-        buttonLastReading = reading;
-        buttonChangeMs = now;
-    }
-
-    if ((now - buttonChangeMs) >= DEBOUNCE_MS)
-    {
-        buttonStable = reading;
-    }
-}
-
-// =====================================================
-// SETUP
-// =====================================================
-void setup()
-{
-    Serial.begin(115200);
-
-    // Allow time for USB serial to initialize.
     delay(500);
 
-    analogReadResolution(12);
+    for (int i = 0; i < samples; i++) {
+        sumX += analogRead(JOY_X_PIN);
+        sumY += analogRead(JOY_Y_PIN);
+        delay(5);
+    }
+
+    centerX = static_cast<float>(sumX) / samples;
+    centerY = static_cast<float>(sumY) / samples;
+}
+
+void setup() {
+    Serial.begin(USB_BAUD);
 
     pinMode(JOY_SW_PIN, INPUT_PULLUP);
+    analogReadResolution(12);
 
-    delay(300);
+    // Explicitly assign Serial1's RX and TX pins.
+    Serial1.setPins(UART_RX_PIN, UART_TX_PIN);
+    Serial1.begin(UART_BAUD);
+
+    delay(200);
+
+    Serial.println();
+    Serial.println("Joystick transmitter starting...");
+    Serial.println("Keep the joystick centered for calibration.");
 
     calibrateJoystick();
 
-    lastSampleMs = millis();
-    lastPrintMs = millis();
-
-    Serial.println("Joystick controller ready.");
-    Serial.println("Output: x,y,button");
+    Serial.printf("Center X: %.1f, Center Y: %.1f\n",
+                  centerX, centerY);
+    Serial.println("UART: 9600 baud, RX=D5, TX=D6");
 }
 
-// =====================================================
-// MAIN LOOP
-// =====================================================
-void loop()
-{
+void loop() {
     uint32_t now = millis();
 
-    // Sample joystick at approximately 50 Hz.
-    if (now - lastSampleMs >= SAMPLE_INTERVAL_MS)
-    {
-        lastSampleMs = now;
+    // Debounce the active-low joystick button.
+    bool buttonReading = (digitalRead(JOY_SW_PIN) == LOW);
 
-        int rawX = analogRead(JOY_X_PIN);
-        int rawY = analogRead(JOY_Y_PIN);
-
-        float targetX =
-            normalizeAxis(rawX, centerX, INVERT_X);
-
-        float targetY =
-            normalizeAxis(rawY, centerY, INVERT_Y);
-
-        // Smooth the readings.
-        filteredX +=
-            FILTER_ALPHA * (targetX - filteredX);
-
-        filteredY +=
-            FILTER_ALPHA * (targetY - filteredY);
-
-        updateButton();
-
-        // Save the latest raw readings for printing.
-        static int latestRawX = 0;
-        static int latestRawY = 0;
-
-        latestRawX = rawX;
-        latestRawY = rawY;
+    if (buttonReading != buttonLastReading) {
+        buttonLastReading = buttonReading;
+        buttonChangeTime = now;
     }
 
-    // Print at approximately 10 Hz.
-    if (now - lastPrintMs >= PRINT_INTERVAL_MS)
-    {
-        lastPrintMs = now;
+    if (now - buttonChangeTime >= DEBOUNCE_MS) {
+        buttonStable = buttonLastReading;
+    }
 
-        // Read current raw values for diagnostic output.
-        int rawX = analogRead(JOY_X_PIN);
-        int rawY = analogRead(JOY_Y_PIN);
+    // Send commands at 50 Hz.
+    if (now - lastSendTime >= SEND_INTERVAL_MS) {
+        lastSendTime = now;
 
-        Serial.printf(
-            "Raw X: %d, Raw Y: %d | x=%.3f, y=%.3f, button=%d\n",
-            rawX,
-            rawY,
-            filteredX,
-            filteredY,
-            buttonStable ? 1 : 0
-        );
+        float x = readAxis(JOY_X_PIN, centerX, INVERT_X);
+        float y = readAxis(JOY_Y_PIN, centerY, INVERT_Y);
+
+        filteredX += FILTER_ALPHA * (x - filteredX);
+        filteredY += FILTER_ALPHA * (y - filteredY);
+
+        // CSV format: X,Y,button
+        Serial1.printf("%.3f,%.3f,%d\n",
+                       filteredX,
+                       filteredY,
+                       buttonStable ? 1 : 0);
+    }
+
+    // USB diagnostics at 10 Hz.
+    if (now - lastDebugTime >= DEBUG_INTERVAL_MS) {
+        lastDebugTime = now;
+
+        Serial.printf("X: %.2f  Y: %.2f  Button: %d\n",
+                      filteredX,
+                      filteredY,
+                      buttonStable ? 1 : 0);
     }
 }
+ 
