@@ -11,7 +11,7 @@ constexpr int UART_RX_PIN = 5;
 constexpr int UART_TX_PIN = 6;
 
 constexpr uint32_t USB_BAUD  = 115200;
-constexpr uint32_t UART_BAUD = 9600;
+constexpr uint32_t UART_BAUD = 115200;
 
 constexpr uint32_t SEND_INTERVAL_MS  = 20;
 constexpr uint32_t DEBUG_INTERVAL_MS = 100;
