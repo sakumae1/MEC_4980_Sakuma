@@ -4,25 +4,24 @@
 // Joystick inputs
 constexpr int JOY_X_PIN  = A0;
 constexpr int JOY_Y_PIN  = A1;
-constexpr int JOY_SW_PIN = 9;   // Button moved from D5 to D9
+constexpr int JOY_SW_PIN = 9;
 
-// UART pins for communication with the motor Feather
-constexpr int UART_RX_PIN = 5;  // D5
-constexpr int UART_TX_PIN = 6;  // D6
+// UART connection to motor board
+constexpr int UART_RX_PIN = 5;
+constexpr int UART_TX_PIN = 6;
 
 constexpr uint32_t USB_BAUD  = 115200;
 constexpr uint32_t UART_BAUD = 9600;
 
-constexpr uint32_t SEND_INTERVAL_MS = 20;  // 50 Hz
+constexpr uint32_t SEND_INTERVAL_MS  = 20;
 constexpr uint32_t DEBUG_INTERVAL_MS = 100;
+constexpr uint32_t DEBOUNCE_MS       = 30;
 
 constexpr float DEAD_ZONE = 0.08f;
 constexpr float FILTER_ALPHA = 0.25f;
 
 constexpr bool INVERT_X = false;
 constexpr bool INVERT_Y = true;
-
-constexpr uint32_t DEBOUNCE_MS = 30;
 
 float centerX = 2048.0f;
 float centerY = 2048.0f;
@@ -40,15 +39,23 @@ uint32_t lastDebugTime = 0;
 float readAxis(int pin, float center, bool invert) {
     int raw = analogRead(pin);
 
-    float value = (raw - center) / 2048.0f;
+    // Normalize each side of the measured center.
+    float value;
+
+    if (raw >= center) {
+        value = (raw - center) / (4095.0f - center);
+    } else {
+        value = (raw - center) / center;
+    }
+
     value = constrain(value, -1.0f, 1.0f);
 
     if (fabsf(value) < DEAD_ZONE) {
         value = 0.0f;
     } else {
-        // Rescale the remaining range so output still reaches full scale.
-        float magnitude = (fabsf(value) - DEAD_ZONE)
-                        / (1.0f - DEAD_ZONE);
+        float magnitude =
+            (fabsf(value) - DEAD_ZONE) / (1.0f - DEAD_ZONE);
+
         value = copysignf(magnitude, value);
     }
 
@@ -75,6 +82,10 @@ void calibrateJoystick() {
 
     centerX = static_cast<float>(sumX) / samples;
     centerY = static_cast<float>(sumY) / samples;
+
+    // Prevent division by zero if an input reads at an endpoint.
+    centerX = constrain(centerX, 1.0f, 4094.0f);
+    centerY = constrain(centerY, 1.0f, 4094.0f);
 }
 
 void setup() {
@@ -83,27 +94,34 @@ void setup() {
     pinMode(JOY_SW_PIN, INPUT_PULLUP);
     analogReadResolution(12);
 
-    // Explicitly assign Serial1's RX and TX pins.
-    Serial1.setPins(UART_RX_PIN, UART_TX_PIN);
-    Serial1.begin(UART_BAUD);
+    Serial1.begin(
+        UART_BAUD,
+        SERIAL_8N1,
+        UART_RX_PIN,
+        UART_TX_PIN
+    );
 
     delay(200);
 
     Serial.println();
     Serial.println("Joystick transmitter starting...");
-    Serial.println("Keep the joystick centered for calibration.");
+    Serial.println("Keep joystick centered for calibration.");
 
     calibrateJoystick();
 
-    Serial.printf("Center X: %.1f, Center Y: %.1f\n",
-                  centerX, centerY);
+    Serial.printf(
+        "Center X: %.1f, Center Y: %.1f\n",
+        centerX, centerY
+    );
+
     Serial.println("UART: 9600 baud, RX=D5, TX=D6");
+    Serial.println("Joystick: X=A0, Y=A1, SW=D9");
 }
 
 void loop() {
     uint32_t now = millis();
 
-    // Debounce the active-low joystick button.
+    // Debounce the active-low button.
     bool buttonReading = (digitalRead(JOY_SW_PIN) == LOW);
 
     if (buttonReading != buttonLastReading) {
@@ -115,7 +133,7 @@ void loop() {
         buttonStable = buttonLastReading;
     }
 
-    // Send commands at 50 Hz.
+    // Read and send joystick commands at 50 Hz.
     if (now - lastSendTime >= SEND_INTERVAL_MS) {
         lastSendTime = now;
 
@@ -125,21 +143,33 @@ void loop() {
         filteredX += FILTER_ALPHA * (x - filteredX);
         filteredY += FILTER_ALPHA * (y - filteredY);
 
-        // CSV format: X,Y,button
-        Serial1.printf("%.3f,%.3f,%d\n",
-                       filteredX,
-                       filteredY,
-                       buttonStable ? 1 : 0);
+        // Allow filtered values to settle completely to zero.
+        if (x == 0.0f && fabsf(filteredX) < 0.01f) {
+            filteredX = 0.0f;
+        }
+
+        if (y == 0.0f && fabsf(filteredY) < 0.01f) {
+            filteredY = 0.0f;
+        }
+
+        // Receiver expects: X,Y,button followed by newline.
+        Serial1.printf(
+            "%.3f,%.3f,%d\n",
+            filteredX,
+            filteredY,
+            buttonStable ? 1 : 0
+        );
     }
 
-    // USB diagnostics at 10 Hz.
+    // USB Serial Monitor diagnostics at 10 Hz.
     if (now - lastDebugTime >= DEBUG_INTERVAL_MS) {
         lastDebugTime = now;
 
-        Serial.printf("X: %.2f  Y: %.2f  Button: %d\n",
-                      filteredX,
-                      filteredY,
-                      buttonStable ? 1 : 0);
+        Serial.printf(
+            "X: %.2f  Y: %.2f  Button: %d\n",
+            filteredX,
+            filteredY,
+            buttonStable ? 1 : 0
+        );
     }
 }
- 
