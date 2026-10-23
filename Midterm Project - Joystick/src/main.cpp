@@ -11,9 +11,9 @@ constexpr int UART_RX_PIN = 5;
 constexpr int UART_TX_PIN = 6;
 
 constexpr uint32_t USB_BAUD  = 115200;
-constexpr uint32_t UART_BAUD = 115200;
+constexpr uint32_t UART_BAUD = 9600;
 
-constexpr uint32_t SEND_INTERVAL_MS  = 20;
+constexpr uint32_t SEND_INTERVAL_MS  = 50;
 constexpr uint32_t DEBUG_INTERVAL_MS = 100;
 constexpr uint32_t DEBOUNCE_MS       = 30;
 
@@ -23,11 +23,15 @@ constexpr float FILTER_ALPHA = 0.25f;
 constexpr bool INVERT_X = false;
 constexpr bool INVERT_Y = true;
 
-float centerX = 2048.0f;
-float centerY = 2048.0f;
+// Measured joystick center values
+constexpr float CENTER_X = 1818.0f;
+constexpr float CENTER_Y = 1836.0f;
 
 float filteredX = 0.0f;
 float filteredY = 0.0f;
+
+int latestRawX = 0;
+int latestRawY = 0;
 
 bool buttonStable = false;
 bool buttonLastReading = false;
@@ -36,10 +40,7 @@ uint32_t buttonChangeTime = 0;
 uint32_t lastSendTime = 0;
 uint32_t lastDebugTime = 0;
 
-float readAxis(int pin, float center, bool invert) {
-    int raw = analogRead(pin);
-
-    // Normalize each side of the measured center.
+float normalizeAxis(int raw, float center, bool invert) {
     float value;
 
     if (raw >= center) {
@@ -66,28 +67,6 @@ float readAxis(int pin, float center, bool invert) {
     return value;
 }
 
-void calibrateJoystick() {
-    // Leave the joystick centered during startup.
-    constexpr int samples = 100;
-    uint32_t sumX = 0;
-    uint32_t sumY = 0;
-
-    delay(500);
-
-    for (int i = 0; i < samples; i++) {
-        sumX += analogRead(JOY_X_PIN);
-        sumY += analogRead(JOY_Y_PIN);
-        delay(5);
-    }
-
-    centerX = static_cast<float>(sumX) / samples;
-    centerY = static_cast<float>(sumY) / samples;
-
-    // Prevent division by zero if an input reads at an endpoint.
-    centerX = constrain(centerX, 1.0f, 4094.0f);
-    centerY = constrain(centerY, 1.0f, 4094.0f);
-}
-
 void setup() {
     Serial.begin(USB_BAUD);
 
@@ -101,21 +80,23 @@ void setup() {
         UART_TX_PIN
     );
 
-    delay(200);
+    delay(1000);
 
     Serial.println();
-    Serial.println("Joystick transmitter starting...");
-    Serial.println("Keep joystick centered for calibration.");
-
-    calibrateJoystick();
+    Serial.println("Joystick transmitter ready.");
+    Serial.println("Using fixed measured center values.");
 
     Serial.printf(
         "Center X: %.1f, Center Y: %.1f\n",
-        centerX, centerY
+        CENTER_X,
+        CENTER_Y
     );
 
     Serial.println("UART: 9600 baud, RX=D5, TX=D6");
     Serial.println("Joystick: X=A0, Y=A1, SW=D9");
+
+    lastSendTime = millis();
+    lastDebugTime = millis();
 }
 
 void loop() {
@@ -133,12 +114,20 @@ void loop() {
         buttonStable = buttonLastReading;
     }
 
-    // Read and send joystick commands at 50 Hz.
+    // Read and send joystick commands at 20 Hz.
     if (now - lastSendTime >= SEND_INTERVAL_MS) {
         lastSendTime = now;
 
-        float x = readAxis(JOY_X_PIN, centerX, INVERT_X);
-        float y = readAxis(JOY_Y_PIN, centerY, INVERT_Y);
+        latestRawX = analogRead(JOY_X_PIN);
+        latestRawY = analogRead(JOY_Y_PIN);
+
+        float x = normalizeAxis(
+            latestRawX, CENTER_X, INVERT_X
+        );
+
+        float y = normalizeAxis(
+            latestRawY, CENTER_Y, INVERT_Y
+        );
 
         filteredX += FILTER_ALPHA * (x - filteredX);
         filteredY += FILTER_ALPHA * (y - filteredY);
@@ -152,7 +141,7 @@ void loop() {
             filteredY = 0.0f;
         }
 
-        // Receiver expects: X,Y,button followed by newline.
+        // Send X,Y,button to the motor board.
         Serial1.printf(
             "%.3f,%.3f,%d\n",
             filteredX,
@@ -161,15 +150,22 @@ void loop() {
         );
     }
 
-    // USB Serial Monitor diagnostics at 10 Hz.
+    // USB diagnostics
     if (now - lastDebugTime >= DEBUG_INTERVAL_MS) {
         lastDebugTime = now;
 
         Serial.printf(
-            "X: %.2f  Y: %.2f  Button: %d\n",
+            "Raw X=%d Center X=%.1f | "
+            "Raw Y=%d Center Y=%.1f | "
+            "X=%.3f Y=%.3f Button=%d\n",
+            latestRawX,
+            CENTER_X,
+            latestRawY,
+            CENTER_Y,
             filteredX,
             filteredY,
             buttonStable ? 1 : 0
         );
     }
 }
+ 
