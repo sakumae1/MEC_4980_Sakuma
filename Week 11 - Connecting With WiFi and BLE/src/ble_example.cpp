@@ -83,6 +83,7 @@ void loop() {
     static uint8_t displayedCommand = 0;
     const uint8_t command = pixelCommand.load();
     if (command != displayedCommand) {
+        // neopixelWrite(PIN_NEOPIXWL, 64, 0, 0);
         neopixelWrite(PIN_NEOPIXEL,
                       command == 1 ? RGB_BRIGHTNESS : 0,
                       command == 2 ? RGB_BRIGHTNESS : 0,

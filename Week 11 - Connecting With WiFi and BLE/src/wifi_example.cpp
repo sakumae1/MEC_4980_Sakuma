@@ -31,6 +31,19 @@ constexpr char page[] PROGMEM = R"html(
   <button id="weatherButton" onclick="update('/weather', 'weather', this)">Update weather</button>
   <p id="clock">Press the button to get Central time.</p>
   <button id="clockButton" onclick="update('/clock', 'clock', this)">Update Central time</button>
+  
+  <p id="reset">Press the button to turn off LED.</p>
+  <button id="colorReset" onclick="update('/reset', 'reset', this)">Turn LED Off</button>
+
+  <p id="red">Press the button to turn on red LED.</p>
+  <button id="redButton" onclick="update('/red', 'red', this)">Turn LED Red</button>
+
+  <p id="green">Press the button to turn on green LED.</p>
+  <button id="greenButton" onclick="update('/green', 'green', this)">Turn LED Green</button>
+
+  <p id="blue">Press the button to turn on blue LED.</p>
+  <button id="blueButton" onclick="update('/blue', 'blue', this)">Turn LED Blue</button>
+
   <script>
     async function update(url, id, button) {
       button.disabled = true;
@@ -50,6 +63,7 @@ constexpr char page[] PROGMEM = R"html(
       .catch(() => document.getElementById('location').textContent = 'Unavailable');
     update('/weather', 'weather', document.getElementById('weatherButton'));
     update('/clock', 'clock', document.getElementById('clockButton'));
+    
   </script>
 </body>
 </html>
@@ -128,6 +142,30 @@ bool getCentralTime(String& result) {
     return true;
 }
 
+bool resetColor(String& result) {
+    neopixelWrite(PIN_NEOPIXEL, 0, 0, 0); 
+    result = "LED turned off.";
+    return true;
+}
+
+bool Red(String& result) {
+    neopixelWrite(PIN_NEOPIXEL, 64, 0, 0);
+    result = "LED turned Red.";
+    return true;
+}
+
+bool Green(String& result) {
+    neopixelWrite(PIN_NEOPIXEL, 0, 64, 0);
+    result = "LED turned Green.";
+    return true;
+}
+
+bool Blue(String& reslut) {
+    neopixelWrite(PIN_NEOPIXEL, 0, 0, 64);
+    reslut = "LED turned Blue.";
+    return true;
+}
+
 void sendUpdate(bool (*update)(String&)) {
     String result;
     const bool success = update(result);
@@ -145,10 +183,21 @@ void setup() {
     Serial.print("Connecting to Wi-Fi: ");
     Serial.println(wifiSsid);
 
+    pinMode(1, INPUT_PULLDOWN);
+    pinMode(2, INPUT_PULLDOWN);  
+    pinMode(NEOPIXEL_POWER, OUTPUT);
+    digitalWrite(NEOPIXEL_POWER, NEOPIXEL_POWER_ON);
+    neopixelWrite(PIN_NEOPIXEL, 0, 0, 0);
+
     server.on("/", HTTP_GET, []() { server.send_P(200, "text/html; charset=utf-8", page); });
     server.on("/location", HTTP_GET, []() { server.send(200, "text/plain; charset=utf-8", locationName); });
     server.on("/weather", HTTP_GET, []() { sendUpdate(getWeather); });
     server.on("/clock", HTTP_GET, []() { sendUpdate(getCentralTime); });
+
+    server.on("/reset", HTTP_GET, []() { sendUpdate(resetColor); });
+    server.on("/red", HTTP_GET, []() { sendUpdate(Red); });
+    server.on("/green", HTTP_GET, []() { sendUpdate(Green); });
+    server.on("/blue", HTTP_GET, []() { sendUpdate(Blue); });
 }
 
 void loop() {
